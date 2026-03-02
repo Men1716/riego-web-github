@@ -4,6 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>🌱 Sistema de Riego Inteligente</title>
+  
+  <!-- ✅ Firebase SDK en el HEAD (se cargan PRIMERO): -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+  
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -139,21 +144,21 @@
     </p>
   </div>
 
+  <!-- ✅ Script principal (ahora Firebase YA está cargado): -->
   <script>
     // ==== CONFIGURACIÓN DE FIREBASE ====
     const firebaseConfig = {
-      // ✅ URL corregida (SIN espacios al final):
       databaseURL: "https://sistema-de-riego-remoto-default-rtdb.firebaseio.com"
     };
     
-    // ✅ INICIALIZAR FIREBASE (esto era lo que faltaba - CRÍTICO):
+    // ✅ Inicializar Firebase (ahora sí funciona):
     firebase.initializeApp(firebaseConfig);
     
     // Estado local
     let relayState = false;
     let bloqueo = false;
     
-    // Conectar a Firebase (ahora sí funciona porque ya está inicializado)
+    // Conectar a Firebase
     const dbRef = firebase.database().ref();
     
     // Escuchar cambios en sensores
@@ -178,7 +183,7 @@
           estadoEl.classList.add('estado-ideal');
         }
         
-        // Actualizar timestamp (mostrando segundos desde inicio del ESP32)
+        // Actualizar timestamp
         if (data.ultima_actualizacion) {
           const segundos = Math.floor(data.ultima_actualizacion / 1000);
           document.getElementById('ultimaActualizacion').textContent = segundos + 's';
@@ -190,7 +195,7 @@
       }
     });
     
-    // Escuchar cambios en control (rele y bloqueo)
+    // Escuchar cambios en control
     dbRef.child('control').on('value', (snapshot) => {
       const data = snapshot.val();
       if (data) {
@@ -200,7 +205,7 @@
       }
     });
     
-    // Actualizar estado del botón según relayState y bloqueo
+    // Actualizar estado del botón
     function actualizarBoton() {
       const btn = document.getElementById('btnRiego');
       if (bloqueo) {
@@ -217,7 +222,7 @@
       }
     }
     
-    // Alternar relé: envía el estado OPUESTO al actual
+    // Alternar relé
     function toggleRelay() {
       if (bloqueo) {
         alert('🔒 Sistema bloqueado desde Telegram');
@@ -235,12 +240,8 @@
         });
     }
     
-    // Inicializar estado del botón al cargar
+    // Inicializar
     actualizarBoton();
   </script>
-  
-  <!-- Firebase SDK (URLs corregidas, SIN espacios) -->
-  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 </body>
 </html>
