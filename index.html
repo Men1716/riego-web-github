@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🌱 Sistema de Riego Inteligente</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    .container {
+      background: white;
+      border-radius: 20px;
+      padding: 30px;
+      max-width: 500px;
+      width: 100%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    h1 {
+      text-align: center;
+      color: #333;
+      margin-bottom: 30px;
+      font-size: 1.8em;
+    }
+    .sensor-card {
+      background: #f8f9fa;
+      border-radius: 15px;
+      padding: 20px;
+      margin-bottom: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .sensor-label {
+      font-size: 1.1em;
+      color: #666;
+    }
+    .sensor-value {
+      font-size: 1.5em;
+      font-weight: bold;
+      color: #333;
+    }
+    .estado-agua {
+      text-align: center;
+      padding: 15px;
+      border-radius: 10px;
+      margin: 20px 0;
+      font-weight: bold;
+      font-size: 1.2em;
+    }
+    .estado-falta { background: #ffebee; color: #c62828; }
+    .estado-ideal { background: #e8f5e9; color: #2e7d32; }
+    .estado-mucha { background: #e3f2fd; color: #1565c0; }
+    .btn-riego {
+      width: 100%;
+      padding: 20px;
+      border: none;
+      border-radius: 15px;
+      font-size: 1.3em;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s;
+      margin-top: 20px;
+    }
+    .btn-activar {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    .btn-desactivar {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      color: white;
+    }
+    .btn-riego:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+    }
+    .btn-riego:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .loading {
+      text-align: center;
+      color: #666;
+      padding: 20px;
+    }
+    .status-indicator {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+    .status-online { background: #4caf50; }
+    .status-offline { background: #f44336; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🌱 Sistema de Riego Inteligente</h1>
+    
+    <div style="text-align: center; margin-bottom: 20px;">
+      <span class="status-indicator" id="statusIndicator"></span>
+      <span id="statusText">Conectando...</span>
+    </div>
+    
+    <div class="sensor-card">
+      <span class="sensor-label">🌡️ Temperatura</span>
+      <span class="sensor-value" id="temp">-- °C</span>
+    </div>
+    
+    <div class="sensor-card">
+      <span class="sensor-label">💧 Humedad Aire</span>
+      <span class="sensor-value" id="humAire">-- %</span>
+    </div>
+    
+    <div class="sensor-card">
+      <span class="sensor-label">🌱 Humedad Suelo</span>
+      <span class="sensor-value" id="humSuelo">-- %</span>
+    </div>
+    
+    <div class="estado-agua estado-ideal" id="estadoAgua">
+      Cargando datos...
+    </div>
+    
+    <button class="btn-riego btn-activar" id="btnRiego" onclick="toggleRelay()">
+      🔴 ACTIVAR RIEGO
+    </button>
+    
+    <p style="text-align: center; margin-top: 15px; color: #666; font-size: 0.9em;">
+      Última actualización: <span id="ultimaActualizacion">--</span>
+    </p>
+  </div>
+
+  <script>
+    // ==== CONFIGURACIÓN DE FIREBASE ====
+    const firebaseConfig = {
+      databaseURL: "https://riego-escolar-default-rtdb.firebaseio.com/"
+    };
+    
+    // Estado local
+    let relayState = false;
+    let bloqueo = false;
+    
+    // Conectar a Firebase
+    const dbRef = firebase.database().ref();
+    
+    // Escuchar cambios en sensores
+    dbRef.child('sensores').on('value', (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        document.getElementById('temp').textContent = data.temperatura?.toFixed(1) + ' °C' || '--';
+        document.getElementById('humAire').textContent = data.humedad_aire?.toFixed(0) + ' %' || '--';
+        document.getElementById('humSuelo').textContent = data.humedad_suelo?.toFixed(0) + ' %' || '--';
+        
+        // Actualizar estado del agua
+        const estadoEl = document.getElementById('estadoAgua');
+        estadoEl.className = 'estado-agua';
+        if (data.humedad_suelo <= 20) {
+          estadoEl.textContent = '⚠️ Falta agua';
+          estadoEl.classList.add('estado-falta');
+        } else if (data.humedad_suelo >= 80) {
+          estadoEl.textContent = '💙 Mucha agua';
+          estadoEl.classList.add('estado-mucha');
+        } else {
+          estadoEl.textContent = '✅ Agua ideal';
+          estadoEl.classList.add('estado-ideal');
+        }
+        
+        // Actualizar timestamp
+        if (data.ultima_actualizacion) {
+          const fecha = new Date(data.ultima_actualizacion);
+          document.getElementById('ultimaActualizacion').textContent = fecha.toLocaleTimeString();
+        }
+        
+        // Mostrar conectado
+        document.getElementById('statusIndicator').className = 'status-indicator status-online';
+        document.getElementById('statusText').textContent = 'En línea';
+      }
+    });
+    
+    // Escuchar cambios en control
+    dbRef.child('control').on('value', (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        relayState = data.rele || false;
+        bloqueo = data.bloqueo || false;
+        actualizarBoton();
+      }
+    });
+    
+    // Actualizar estado del botón
+    function actualizarBoton() {
+      const btn = document.getElementById('btnRiego');
+      if (bloqueo) {
+        btn.disabled = true;
+        btn.textContent = '🔒 SISTEMA BLOQUEADO';
+        btn.className = 'btn-riego';
+        btn.style.background = '#ccc';
+      } else if (relayState) {
+        btn.textContent = '🟢 DESACTIVAR RIEGO';
+        btn.className = 'btn-riego btn-desactivar';
+      } else {
+        btn.textContent = '🔴 ACTIVAR RIEGO';
+        btn.className = 'btn-riego btn-activar';
+      }
+    }
+    
+    // Alternar relé
+    function toggleRelay() {
+      if (bloqueo) return;
+      
+      const nuevoEstado = !relayState;
+      dbRef.child('control/rele').set(nuevoEstado)
+        .then(() => {
+          console.log('Comando enviado:', nuevoEstado ? 'ON' : 'OFF');
+        })
+        .catch((error) => {
+          alert('Error al enviar comando: ' + error.message);
+        });
+    }
+    
+    // Inicializar
+    actualizarBoton();
+  </script>
+  
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+</body>
+</html>
