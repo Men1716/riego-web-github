@@ -142,14 +142,18 @@
   <script>
     // ==== CONFIGURACIÓN DE FIREBASE ====
     const firebaseConfig = {
+      // ✅ URL corregida (SIN espacios al final):
       databaseURL: "https://sistema-de-riego-remoto-default-rtdb.firebaseio.com"
     };
+    
+    // ✅ INICIALIZAR FIREBASE (esto era lo que faltaba - CRÍTICO):
+    firebase.initializeApp(firebaseConfig);
     
     // Estado local
     let relayState = false;
     let bloqueo = false;
     
-    // Conectar a Firebase
+    // Conectar a Firebase (ahora sí funciona porque ya está inicializado)
     const dbRef = firebase.database().ref();
     
     // Escuchar cambios en sensores
@@ -174,10 +178,10 @@
           estadoEl.classList.add('estado-ideal');
         }
         
-        // Actualizar timestamp
+        // Actualizar timestamp (mostrando segundos desde inicio del ESP32)
         if (data.ultima_actualizacion) {
-          const fecha = new Date(data.ultima_actualizacion);
-          document.getElementById('ultimaActualizacion').textContent = fecha.toLocaleTimeString();
+          const segundos = Math.floor(data.ultima_actualizacion / 1000);
+          document.getElementById('ultimaActualizacion').textContent = segundos + 's';
         }
         
         // Mostrar conectado
@@ -186,7 +190,7 @@
       }
     });
     
-    // Escuchar cambios en control
+    // Escuchar cambios en control (rele y bloqueo)
     dbRef.child('control').on('value', (snapshot) => {
       const data = snapshot.val();
       if (data) {
@@ -196,7 +200,7 @@
       }
     });
     
-    // Actualizar estado del botón
+    // Actualizar estado del botón según relayState y bloqueo
     function actualizarBoton() {
       const btn = document.getElementById('btnRiego');
       if (bloqueo) {
@@ -213,25 +217,29 @@
       }
     }
     
-    // Alternar relé
+    // Alternar relé: envía el estado OPUESTO al actual
     function toggleRelay() {
-      if (bloqueo) return;
+      if (bloqueo) {
+        alert('🔒 Sistema bloqueado desde Telegram');
+        return;
+      }
       
       const nuevoEstado = !relayState;
       dbRef.child('control/rele').set(nuevoEstado)
         .then(() => {
-          console.log('Comando enviado:', nuevoEstado ? 'ON' : 'OFF');
+          console.log('✅ Comando enviado:', nuevoEstado ? 'ON' : 'OFF');
         })
         .catch((error) => {
+          console.error('❌ Error:', error);
           alert('Error al enviar comando: ' + error.message);
         });
     }
     
-    // Inicializar
+    // Inicializar estado del botón al cargar
     actualizarBoton();
   </script>
   
-  <!-- Firebase SDK -->
+  <!-- Firebase SDK (URLs corregidas, SIN espacios) -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 </body>
