@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>🌱 Sistema de Riego - Monitoreo</title>
   
-  <!-- Firebase SDK -->
+  <!-- Firebase SDK (Cargados desde CDN oficial) -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
   
@@ -130,12 +130,12 @@
     </div>
     
     <div class="estado-agua estado-ideal" id="estadoAgua">
-      ⏳ Cargando datos...
+      ⏳ Verificando conexión...
     </div>
     
     <div class="status-bar">
       <span class="status-indicator" id="statusIndicator"></span>
-      <span id="statusText">Conectando...</span>
+      <span id="statusText">Iniciando...</span>
     </div>
     
     <p class="timestamp">
@@ -146,70 +146,91 @@
   <script>
     // ==== CONFIGURACIÓN DE FIREBASE ====
     const firebaseConfig = {
+      // ✅ URL EXACTA (Sin espacios, sin barra al final)
       databaseURL: "https://sistema-de-riego-remoto-default-rtdb.firebaseio.com"
     };
     
-    // Inicializar Firebase
-    firebase.initializeApp(firebaseConfig);
-    
-    // Referencia a la base de datos
-    const dbRef = firebase.database().ref();
-    
-    // Escuchar cambios en sensores
-    dbRef.child('sensores').on('value', (snapshot) => {
-      const data = snapshot.val();
-      
-      if (data) {
-        // Actualizar Temperatura
-        if (data.temperatura !== undefined && !isNaN(data.temperatura)) {
-          document.getElementById('temp').textContent = data.temperatura.toFixed(1) + ' °C';
-        }
-        
-        // Actualizar Humedad Aire
-        if (data.humedad_aire !== undefined && !isNaN(data.humedad_aire)) {
-          document.getElementById('humAire').textContent = data.humedad_aire.toFixed(0) + ' %';
-        }
-        
-        // Actualizar Humedad Suelo y estado
-        if (data.humedad_suelo !== undefined && !isNaN(data.humedad_suelo)) {
-          document.getElementById('humSuelo').textContent = data.humedad_suelo.toFixed(0) + ' %';
-          
-          // Actualizar estado del agua
-          const estadoEl = document.getElementById('estadoAgua');
-          const sueloPct = data.humedad_suelo;
-          
-          if (sueloPct <= 20) {
-            estadoEl.textContent = '⚠️ Falta agua - Suelo seco';
-            estadoEl.className = 'estado-agua estado-falta';
-          } else if (sueloPct >= 80) {
-            estadoEl.textContent = '💙 Mucha agua - Suelo saturado';
-            estadoEl.classList.add('estado-mucha');
-          } else {
-            estadoEl.textContent = '✅ Agua ideal - Suelo húmedo';
-            estadoEl.classList.add('estado-ideal');
-          }
-        }
-        
-        // Actualizar timestamp
-        if (data.ultima_actualizacion) {
-          const segundos = Math.floor(data.ultima_actualizacion / 1000);
-          document.getElementById('ultimaActualizacion').textContent = segundos + ' segundos';
-        }
-        
-        // Mostrar conectado
-        document.getElementById('statusIndicator').className = 'status-indicator status-online';
-        document.getElementById('statusText').textContent = '● En línea - Datos en tiempo real';
+    // ==== INICIALIZACIÓN SEGURA ====
+    try {
+      // Verificar que Firebase esté cargado
+      if (typeof firebase === 'undefined') {
+        throw new Error('Firebase SDK no se cargó. Verifica tu conexión a internet.');
       }
-    });
-    
-    // Manejo de errores
-    dbRef.child('sensores').on('error', (error) => {
-      console.error('❌ Error de Firebase:', error.message);
+      
+      // Inicializar Firebase
+      firebase.initializeApp(firebaseConfig);
+      console.log('✅ Firebase inicializado correctamente');
+      
+      // Referencia a la base de datos
+      const dbRef = firebase.database().ref();
+      console.log('✅ Referencia a Firebase creada');
+      
+      // Escuchar cambios en sensores
+      dbRef.child('sensores').on('value', (snapshot) => {
+        console.log('📦 Datos recibidos:', snapshot.val());
+        
+        const data = snapshot.val();
+        
+        if (data) {
+          // Actualizar Temperatura
+          if (data.temperatura !== undefined && !isNaN(data.temperatura)) {
+            document.getElementById('temp').textContent = data.temperatura.toFixed(1) + ' °C';
+          }
+          
+          // Actualizar Humedad Aire
+          if (data.humedad_aire !== undefined && !isNaN(data.humedad_aire)) {
+            document.getElementById('humAire').textContent = data.humedad_aire.toFixed(0) + ' %';
+          }
+          
+          // Actualizar Humedad Suelo y estado
+          if (data.humedad_suelo !== undefined && !isNaN(data.humedad_suelo)) {
+            document.getElementById('humSuelo').textContent = data.humedad_suelo.toFixed(0) + ' %';
+            
+            // Actualizar estado del agua
+            const estadoEl = document.getElementById('estadoAgua');
+            const sueloPct = data.humedad_suelo;
+            
+            if (sueloPct <= 20) {
+              estadoEl.textContent = '⚠️ Falta agua - Suelo seco';
+              estadoEl.className = 'estado-agua estado-falta';
+            } else if (sueloPct >= 80) {
+              estadoEl.textContent = '💙 Mucha agua - Suelo saturado';
+              estadoEl.className = 'estado-agua estado-mucha';
+            } else {
+              estadoEl.textContent = '✅ Agua ideal - Suelo húmedo';
+              estadoEl.className = 'estado-agua estado-ideal';
+            }
+          }
+          
+          // Actualizar timestamp
+          if (data.ultima_actualizacion) {
+            const segundos = Math.floor(data.ultima_actualizacion / 1000);
+            document.getElementById('ultimaActualizacion').textContent = segundos + ' segundos';
+          }
+          
+          // Mostrar conectado
+          document.getElementById('statusIndicator').className = 'status-indicator status-online';
+          document.getElementById('statusText').textContent = '● En línea - Datos en tiempo real';
+        } else {
+          console.warn('⚠️ Firebase está vacío - El ESP32 no está enviando datos');
+          document.getElementById('estadoAgua').textContent = '⏳ Esperando datos del ESP32...';
+          document.getElementById('estadoAgua').className = 'estado-agua estado-ideal';
+        }
+      }, (error) => {
+        console.error('❌ Error al leer Firebase:', error.code, error.message);
+        document.getElementById('statusIndicator').className = 'status-indicator status-offline';
+        document.getElementById('statusText').textContent = '✗ Error: ' + error.message;
+        document.getElementById('estadoAgua').textContent = '❌ Error de conexión';
+        document.getElementById('estadoAgua').className = 'estado-agua estado-falta';
+      });
+      
+    } catch (error) {
+      console.error('❌ Error crítico:', error);
       document.getElementById('statusIndicator').className = 'status-indicator status-offline';
-      document.getElementById('statusText').textContent = '✗ Error de conexión';
-      document.getElementById('estadoAgua').textContent = '❌ Error al cargar datos';
+      document.getElementById('statusText').textContent = '✗ Error: ' + error.message;
+      document.getElementById('estadoAgua').textContent = '❌ ' + error.message;
       document.getElementById('estadoAgua').className = 'estado-agua estado-falta';
-    });
+    }
   </script>
 </body>
 </html>
