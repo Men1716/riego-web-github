@@ -63,39 +63,6 @@
     .estado-falta { background: #ffebee; color: #c62828; }
     .estado-ideal { background: #e8f5e9; color: #2e7d32; }
     .estado-mucha { background: #e3f2fd; color: #1565c0; }
-    .btn-riego {
-      width: 100%;
-      padding: 20px;
-      border: none;
-      border-radius: 15px;
-      font-size: 1.3em;
-      font-weight: bold;
-      cursor: pointer;
-      transition: all 0.3s;
-      margin-top: 20px;
-    }
-    .btn-activar {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-    }
-    .btn-desactivar {
-      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-      color: white;
-    }
-    .btn-riego:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 10px 20px rgba(0,0,0,0.2);
-    }
-    .btn-riego:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-      transform: none;
-    }
-    .loading {
-      text-align: center;
-      color: #666;
-      padding: 20px;
-    }
     .status-indicator {
       display: inline-block;
       width: 12px;
@@ -135,23 +102,19 @@
       Cargando datos...
     </div>
     
-    <button class="btn-riego btn-activar" id="btnRiego" onclick="toggleRelay()">
-      🔴 ACTIVAR RIEGO
-    </button>
-    
     <p style="text-align: center; margin-top: 15px; color: #666; font-size: 0.9em;">
       Última actualización: <span id="ultimaActualizacion">--</span>
     </p>
   </div>
 
-  <!-- ✅ Script principal (ahora Firebase YA está cargado): -->
   <script>
     // ==== CONFIGURACIÓN DE FIREBASE ====
     const firebaseConfig = {
+      // ✅ URL corregida (SIN espacios al final):
       databaseURL: "https://sistema-de-riego-remoto-default-rtdb.firebaseio.com"
     };
     
-    // ✅ Inicializar Firebase (ahora sí funciona):
+    // ✅ Inicializar Firebase (CRÍTICO):
     firebase.initializeApp(firebaseConfig);
     
     // Estado local
@@ -165,22 +128,33 @@
     dbRef.child('sensores').on('value', (snapshot) => {
       const data = snapshot.val();
       if (data) {
-        document.getElementById('temp').textContent = data.temperatura?.toFixed(1) + ' °C' || '--';
-        document.getElementById('humAire').textContent = data.humedad_aire?.toFixed(0) + ' %' || '--';
-        document.getElementById('humSuelo').textContent = data.humedad_suelo?.toFixed(0) + ' %' || '--';
+        // Temperatura
+        if (data.temperatura !== undefined) {
+          document.getElementById('temp').textContent = data.temperatura.toFixed(1) + ' °C';
+        }
         
-        // Actualizar estado del agua
-        const estadoEl = document.getElementById('estadoAgua');
-        estadoEl.className = 'estado-agua';
-        if (data.humedad_suelo <= 20) {
-          estadoEl.textContent = '⚠️ Falta agua';
-          estadoEl.classList.add('estado-falta');
-        } else if (data.humedad_suelo >= 80) {
-          estadoEl.textContent = '💙 Mucha agua';
-          estadoEl.classList.add('estado-mucha');
-        } else {
-          estadoEl.textContent = '✅ Agua ideal';
-          estadoEl.classList.add('estado-ideal');
+        // Humedad Aire
+        if (data.humedad_aire !== undefined) {
+          document.getElementById('humAire').textContent = data.humedad_aire.toFixed(0) + ' %';
+        }
+        
+        // Humedad Suelo
+        if (data.humedad_suelo !== undefined) {
+          document.getElementById('humSuelo').textContent = data.humedad_suelo.toFixed(0) + ' %';
+          
+          // Actualizar estado del agua
+          const estadoEl = document.getElementById('estadoAgua');
+          estadoEl.className = 'estado-agua';
+          if (data.humedad_suelo <= 20) {
+            estadoEl.textContent = '⚠️ Falta agua';
+            estadoEl.classList.add('estado-falta');
+          } else if (data.humedad_suelo >= 80) {
+            estadoEl.textContent = '💙 Mucha agua';
+            estadoEl.classList.add('estado-mucha');
+          } else {
+            estadoEl.textContent = '✅ Agua ideal';
+            estadoEl.classList.add('estado-ideal');
+          }
         }
         
         // Actualizar timestamp
@@ -195,53 +169,12 @@
       }
     });
     
-    // Escuchar cambios en control
-    dbRef.child('control').on('value', (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        relayState = data.rele || false;
-        bloqueo = data.bloqueo || false;
-        actualizarBoton();
-      }
+    // Manejo de errores de conexión
+    dbRef.child('sensores').on('error', (error) => {
+      console.error('❌ Error de Firebase:', error.message);
+      document.getElementById('statusIndicator').className = 'status-indicator status-offline';
+      document.getElementById('statusText').textContent = 'Error de conexión';
     });
-    
-    // Actualizar estado del botón
-    function actualizarBoton() {
-      const btn = document.getElementById('btnRiego');
-      if (bloqueo) {
-        btn.disabled = true;
-        btn.textContent = '🔒 SISTEMA BLOQUEADO';
-        btn.className = 'btn-riego';
-        btn.style.background = '#ccc';
-      } else if (relayState) {
-        btn.textContent = '🟢 DESACTIVAR RIEGO';
-        btn.className = 'btn-riego btn-desactivar';
-      } else {
-        btn.textContent = '🔴 ACTIVAR RIEGO';
-        btn.className = 'btn-riego btn-activar';
-      }
-    }
-    
-    // Alternar relé
-    function toggleRelay() {
-      if (bloqueo) {
-        alert('🔒 Sistema bloqueado desde Telegram');
-        return;
-      }
-      
-      const nuevoEstado = !relayState;
-      dbRef.child('control/rele').set(nuevoEstado)
-        .then(() => {
-          console.log('✅ Comando enviado:', nuevoEstado ? 'ON' : 'OFF');
-        })
-        .catch((error) => {
-          console.error('❌ Error:', error);
-          alert('Error al enviar comando: ' + error.message);
-        });
-    }
-    
-    // Inicializar
-    actualizarBoton();
   </script>
 </body>
 </html>
