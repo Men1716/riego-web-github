@@ -1,16 +1,22 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>🌱 Sistema de Riego - Monitoreo</title>
-  
+
   <!-- Firebase SDK (Cargados desde CDN oficial) -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-  
+
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -20,26 +26,30 @@
       align-items: center;
       padding: 20px;
     }
+
     .container {
       background: white;
       border-radius: 20px;
       padding: 30px;
       max-width: 500px;
       width: 100%;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
     }
+
     h1 {
       text-align: center;
       color: #333;
       margin-bottom: 10px;
       font-size: 1.8em;
     }
+
     .subtitle {
       text-align: center;
       color: #666;
       margin-bottom: 30px;
       font-size: 0.9em;
     }
+
     .sensor-card {
       background: #f8f9fa;
       border-radius: 15px;
@@ -50,10 +60,12 @@
       align-items: center;
       transition: transform 0.2s;
     }
+
     .sensor-card:hover {
       transform: translateY(-2px);
-      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
     }
+
     .sensor-label {
       font-size: 1.1em;
       color: #666;
@@ -61,11 +73,13 @@
       align-items: center;
       gap: 8px;
     }
+
     .sensor-value {
       font-size: 1.8em;
       font-weight: bold;
       color: #333;
     }
+
     .estado-agua {
       text-align: center;
       padding: 20px;
@@ -74,9 +88,22 @@
       font-weight: bold;
       font-size: 1.3em;
     }
-    .estado-falta { background: #ffebee; color: #c62828; }
-    .estado-ideal { background: #e8f5e9; color: #2e7d32; }
-    .estado-mucha { background: #e3f2fd; color: #1565c0; }
+
+    .estado-falta {
+      background: #ffebee;
+      color: #c62828;
+    }
+
+    .estado-ideal {
+      background: #e8f5e9;
+      color: #2e7d32;
+    }
+
+    .estado-mucha {
+      background: #e3f2fd;
+      color: #1565c0;
+    }
+
     .status-bar {
       display: flex;
       align-items: center;
@@ -89,18 +116,35 @@
       font-size: 0.9em;
       color: #666;
     }
+
     .status-indicator {
       width: 10px;
       height: 10px;
       border-radius: 50%;
       animation: pulse 2s infinite;
     }
-    .status-online { background: #4caf50; }
-    .status-offline { background: #f44336; animation: none; }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
+
+    .status-online {
+      background: #4caf50;
     }
+
+    .status-offline {
+      background: #f44336;
+      animation: none;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.5;
+      }
+    }
+
     .timestamp {
       text-align: center;
       color: #999;
@@ -109,35 +153,36 @@
     }
   </style>
 </head>
+
 <body>
   <div class="container">
     <h1>🌱 Sistema de Riego</h1>
     <p class="subtitle">Monitoreo en tiempo real</p>
-    
+
     <div class="sensor-card">
       <span class="sensor-label">🌡️ Temperatura</span>
       <span class="sensor-value" id="temp">-- °C</span>
     </div>
-    
+
     <div class="sensor-card">
       <span class="sensor-label">💧 Humedad Aire</span>
       <span class="sensor-value" id="humAire">-- %</span>
     </div>
-    
+
     <div class="sensor-card">
       <span class="sensor-label">🌱 Humedad Suelo</span>
       <span class="sensor-value" id="humSuelo">-- %</span>
     </div>
-    
+
     <div class="estado-agua estado-ideal" id="estadoAgua">
       ⏳ Verificando conexión...
     </div>
-    
+
     <div class="status-bar">
       <span class="status-indicator" id="statusIndicator"></span>
       <span id="statusText">Iniciando...</span>
     </div>
-    
+
     <p class="timestamp">
       Última actualización: <span id="ultimaActualizacion">--</span>
     </p>
@@ -146,50 +191,52 @@
   <script>
     // ==== CONFIGURACIÓN DE FIREBASE ====
     const firebaseConfig = {
+      // ✅ API Key extraída de secrets.h
+      apiKey: "AIzaSyAnYbme85F1-IkeHVOCFbuMk7UHYS8LvEU",
       // ✅ URL EXACTA (Sin espacios, sin barra al final)
-      databaseURL: "https://sistema-de-riego-remoto-default-rtdb.firebaseio.com"
+      databaseURL: "https://sistema-de-riego-remoto-default-rtdb.firebaseio.com/"
     };
-    
+
     // ==== INICIALIZACIÓN SEGURA ====
     try {
       // Verificar que Firebase esté cargado
       if (typeof firebase === 'undefined') {
         throw new Error('Firebase SDK no se cargó. Verifica tu conexión a internet.');
       }
-      
+
       // Inicializar Firebase
       firebase.initializeApp(firebaseConfig);
       console.log('✅ Firebase inicializado correctamente');
-      
+
       // Referencia a la base de datos
       const dbRef = firebase.database().ref();
       console.log('✅ Referencia a Firebase creada');
-      
+
       // Escuchar cambios en sensores
       dbRef.child('sensores').on('value', (snapshot) => {
         console.log('📦 Datos recibidos:', snapshot.val());
-        
+
         const data = snapshot.val();
-        
+
         if (data) {
           // Actualizar Temperatura
           if (data.temperatura !== undefined && !isNaN(data.temperatura)) {
             document.getElementById('temp').textContent = data.temperatura.toFixed(1) + ' °C';
           }
-          
+
           // Actualizar Humedad Aire
           if (data.humedad_aire !== undefined && !isNaN(data.humedad_aire)) {
             document.getElementById('humAire').textContent = data.humedad_aire.toFixed(0) + ' %';
           }
-          
+
           // Actualizar Humedad Suelo y estado
           if (data.humedad_suelo !== undefined && !isNaN(data.humedad_suelo)) {
             document.getElementById('humSuelo').textContent = data.humedad_suelo.toFixed(0) + ' %';
-            
+
             // Actualizar estado del agua
             const estadoEl = document.getElementById('estadoAgua');
             const sueloPct = data.humedad_suelo;
-            
+
             if (sueloPct <= 20) {
               estadoEl.textContent = '⚠️ Falta agua - Suelo seco';
               estadoEl.className = 'estado-agua estado-falta';
@@ -201,13 +248,16 @@
               estadoEl.className = 'estado-agua estado-ideal';
             }
           }
-          
+
           // Actualizar timestamp
           if (data.ultima_actualizacion) {
-            const segundos = Math.floor(data.ultima_actualizacion / 1000);
-            document.getElementById('ultimaActualizacion').textContent = segundos + ' segundos';
+            const upTimeSeconds = Math.floor(data.ultima_actualizacion / 1000);
+            const minutos = Math.floor(upTimeSeconds / 60);
+            const segundos = upTimeSeconds % 60;
+            document.getElementById('ultimaActualizacion').textContent =
+              `Hace ${minutos}m ${segundos}s (Relativo al encendido del ESP32)`;
           }
-          
+
           // Mostrar conectado
           document.getElementById('statusIndicator').className = 'status-indicator status-online';
           document.getElementById('statusText').textContent = '● En línea - Datos en tiempo real';
@@ -223,7 +273,7 @@
         document.getElementById('estadoAgua').textContent = '❌ Error de conexión';
         document.getElementById('estadoAgua').className = 'estado-agua estado-falta';
       });
-      
+
     } catch (error) {
       console.error('❌ Error crítico:', error);
       document.getElementById('statusIndicator').className = 'status-indicator status-offline';
@@ -233,4 +283,5 @@
     }
   </script>
 </body>
+
 </html>
